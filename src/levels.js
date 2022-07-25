@@ -241,7 +241,7 @@ export const gameLevels = [
   }
 ];
 
-const gameObjects = [];
+export const gameObjects = [];
 
 class Block {
   constructor(xb, yb, sprite, unit) {
@@ -257,6 +257,53 @@ class Block {
       canvas.current.getContext("2d").drawImage(this.sprite, this.x - 5, this.y - 20, 60, 80);
     }else {
       canvas.current.getContext("2d").drawImage(this.sprite, this.x, this.y, 50, 50);
+    }
+  }
+
+  move(direction, setMoves, setPushes) {
+    switch(direction) {
+      case 37: handleBlockMove.call(this, "left", [-50,0], setMoves, setPushes); break;
+      case 39: handleBlockMove.call(this, "right", [50,0], setMoves, setPushes); break;
+      case 38: handleBlockMove.call(this, "up", [0,-50], setMoves, setPushes); break;
+      case 40: handleBlockMove.call(this, "down", [0,50], setMoves, setPushes); break;
+      default: break; // only for eslint
+    }
+  }
+
+  //return the siblings from the four sides left, right, up and down
+  getSiblings() {
+    const self = this, siblings = {left: 0, right: 0, up: 0, down: 0};
+    gameObjects.forEach(unit => {
+      if(self.x - unit.x === 50 && self.y - unit.y === 0) {
+        siblings.left = unit;
+      }else if(self.x - unit.x === -50 && self.y - unit.y === 0) {
+        siblings.right = unit;
+      }else if(self.y - unit.y === 50 && self.x - unit.x === 0) {
+        siblings.up = unit;
+      }else if(self.y - unit.y === -50 && self.x - unit.x === 0) {
+        siblings.down = unit;
+      }
+    });
+    return siblings;
+  }
+}
+
+function handleBlockMove(direction, moveCoords, setMoves, setPushes) {
+  const siblings = this.getSiblings();
+  if(siblings[direction] === 0) {
+    this.x += moveCoords[0];
+    this.y += moveCoords[1];
+    setMoves(prev => prev + 1);
+    // handleLastMove
+  }else if(siblings[direction].unit !== "wall") {
+    if(this.unit === "boy" && siblings[direction].unit === "box" && siblings[direction].getSiblings()[direction].unit !== "box" && siblings[direction].getSiblings()[direction].unit !== "wall") {
+      siblings[direction].x += moveCoords[0];
+      siblings[direction].y += moveCoords[1];
+      setPushes(prev => prev + 1);
+      this.x += moveCoords[0];
+      this.y += moveCoords[1];
+      setMoves(prev => prev + 1);
+      // handleLastMove
     }
   }
 }
@@ -294,6 +341,28 @@ function createBoxObjects(level, images) {
   for(var i = 0;i < gameLevels[level - 1].boxes.length;i++) {
     const box = gameLevels[level - 1].boxes[i];
     gameObjects.push(new Block(box[0], box[1], images.box, "box"));
+  }
+}
+
+export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner, setIsLocked) {
+  let markedBoxes = 0;
+  gameObjects.forEach(function(obj) {
+    if(obj.unit === "box") {
+      obj.sprite = images.box;
+      gameLevels[level - 1].marks.forEach(function(mark) {
+        if(mark[0] === obj.x / 50 && mark[1] === obj.y / 50) {
+          obj.sprite = images.goldenBox;
+          markedBoxes++;
+        }
+      });
+    }
+  });
+  if(markedBoxes === gameLevels[level - 1].marks.length) {
+    document.body.onkeyup = null;
+    setTimeout(function() {
+      increaseLevel();
+      level === 15 && setIsWinner(true);
+    }, 500);
   }
 }
 
