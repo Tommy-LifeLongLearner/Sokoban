@@ -7,24 +7,24 @@ import grass from "./img/grass.png";
 import mark from "./img/mark.png";
 import './App.css';
 import React, { useState, useEffect, useRef } from 'react';
-import { createImages } from './utils';
+import { createImages, formatNumber } from './utils';
 import { Buttons } from "./Buttons";
 import { Statistics } from "./Statistics";
+import { drawBackground, drawForeground, createLevelObjects } from "./levels";
 
 function App() {
   const [images, setImages] = useState({box, goldenBox, tree, wall, boy, grass, mark});
-  const [moves, setMoves] = useState(999);
-  const [level, setLevel] = useState(999);
-  const [pushes, setPushes] = useState(999);
+  const [moves, setMoves] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [pushes, setPushes] = useState(0);
   const [didImagesLoad, setDidImagesLoad] = useState(false);
+  const [playerPos, setPlayerPos] = useState([]);
   const frontCanvas = useRef();
   const backCanvas = useRef();
 
   useEffect(() => {
     async function initializeImages() {
-      console.log("getting images");
       setImages(await createImages(images));
-      console.log(images);
       setDidImagesLoad(true);
     }
 
@@ -32,30 +32,26 @@ function App() {
   }, [images]);
 
   useEffect(() => {
-    console.log("loaded images", didImagesLoad);
-    console.log(images);
     if(didImagesLoad) {
-      frontCanvas.current.getContext("2d").drawImage(images.boy, -5, -25, 60, 80);
-      backCanvas.current.getContext("2d").drawImage(images.box, -5, -25, 60, 80);
-      setLevel(1);
-      setMoves(0);
-      setPushes(0);
+      drawBackground(backCanvas, level, images);
+      createLevelObjects(level, images);
+      drawForeground(frontCanvas, level, images);
     }
-  }, [didImagesLoad, images]);
+  }, [level, didImagesLoad, images, playerPos]);
 
-  // function draw() {
-  //   if(didImagesLoad) {
-  //     // frontCtx.drawImage(images.boy, -5, -25, 60, 80);
-  //     console.log(images);
+  function increaseLevel() {
+    setLevel(prev => prev < 15 ? prev + 1 : 1);
+  }
 
-  //   }
-  // }
+  function decreaseLevel() {
+    setLevel(prev => prev > 1 ? prev - 1 : 15);
+  }
 
   return (
     <div id="game-container">
       <div id="game-top-bar">
-        <Buttons />
-        <Statistics level={level} moves={moves} pushes={pushes}/>
+        <Buttons increaseLevel={increaseLevel} decreaseLevel={decreaseLevel}/>
+        <Statistics level={formatNumber(level)} moves={formatNumber(moves)} pushes={formatNumber(pushes)}/>
       </div>
       <canvas ref={backCanvas} width="450" height="450"></canvas>
       <canvas ref={frontCanvas} width="450" height="450"></canvas>

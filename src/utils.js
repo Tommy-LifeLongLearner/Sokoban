@@ -18,3 +18,7 @@ export async function createImages(imagesSrc) {
   return images;
 }
 
+export function formatNumber(number) {
+  return "0".repeat(3 - number.toString().length) + number;
+}
+

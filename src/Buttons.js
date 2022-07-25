@@ -1,9 +1,9 @@
 import React from "react";
 
-export function Buttons() {
+export function Buttons({increaseLevel, decreaseLevel}) {
   return (
     <div id="game-buttons" className="c-flex">
-      <button>&#10162;</button><button>&#8678;</button><button>&#8635;</button><button>&#8680;</button>
+      <button title="Undo last move" style={{transform: "rotateY(180deg)"}}>&#10162;</button><button title="Previous level" onClick={decreaseLevel}>&#8678;</button><button title="Restart level">&#8635;</button><button title="Next level" onClick={increaseLevel}>&#8680;</button>
     </div>
   );
 }
