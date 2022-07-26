@@ -10,7 +10,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createImages, formatNumber } from './utils';
 import { Buttons } from "./Buttons";
 import { Statistics } from "./Statistics";
-import { drawBackground, drawForeground, createLevelObjects, gameObjects, handelMarkedBoxes } from "./levels";
+import { drawBackground, drawForeground, createLevelObjects, gameObjects, handelMarkedBoxes, undoLastMove } from "./levels";
 
 function App() {
   const [images, setImages] = useState({box, goldenBox, tree, wall, boy, grass, mark});
@@ -20,6 +20,7 @@ function App() {
   const [didImagesLoad, setDidImagesLoad] = useState(false);
   const [isWinner, setIsWinner] = useState(false);
   const [levelRestart, setLevelRestart] = useState(false);
+  const [lastMoveDisabled, setLastMoveDisabled] = useState(true);
   const frontCanvas = useRef();
   const backCanvas = useRef();
 
@@ -30,8 +31,10 @@ function App() {
         player.move(e.keyCode, setMoves, setPushes);
         handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
         drawForeground(frontCanvas, level, images);
+        setLastMoveDisabled(false);
       }
     };
+
     return _=> {
       document.body.onkeyup = null;
     }
@@ -49,6 +52,7 @@ function App() {
   useEffect(() => {
     // render once per level
     if(didImagesLoad) {
+      setLastMoveDisabled(true);
       setMoves(0);
       setPushes(0);
       drawBackground(backCanvas, level, images);
@@ -74,10 +78,16 @@ function App() {
     setLevelRestart(prev => !prev);
   }
 
+  function undoLastMoveHandler() {
+    undoLastMove(setMoves, setPushes, setLastMoveDisabled);
+    handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
+    drawForeground(frontCanvas, level, images);
+  }
+
   return (
     <div id="game-container" winner={isWinner ? "yes" : ""}>
       <div id="game-top-bar">
-        <Buttons increaseLevel={increaseLevel} decreaseLevel={decreaseLevel} restartLevel={restartLevel}/>
+        <Buttons increaseLevel={increaseLevel} decreaseLevel={decreaseLevel} restartLevel={restartLevel} undoLastMove={undoLastMoveHandler} lastMoveDisabled={lastMoveDisabled}/>
         <Statistics level={formatNumber(level)} moves={formatNumber(moves)} pushes={formatNumber(pushes)}/>
       </div>
       <canvas ref={backCanvas} width="450" height="450"></canvas>

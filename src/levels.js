@@ -242,6 +242,7 @@ export const gameLevels = [
 ];
 
 export const gameObjects = [];
+const gameLastMoves = [];
 
 class Block {
   constructor(xb, yb, sprite, unit) {
@@ -288,13 +289,26 @@ class Block {
   }
 }
 
+function handleLastMove(lastMove) {
+  // store up to 100 previous moves
+  if(gameLastMoves.length === 100) {
+    gameLastMoves.shift();
+  }
+  gameLastMoves.push(lastMove);
+}
+
 function handleBlockMove(direction, moveCoords, setMoves, setPushes) {
   const siblings = this.getSiblings();
   if(siblings[direction] === 0) {
     this.x += moveCoords[0];
     this.y += moveCoords[1];
     setMoves(prev => prev + 1);
-    // handleLastMove
+    handleLastMove (
+      {
+        coords: {x: moveCoords[0], y: moveCoords[1]},
+        box: null
+      }
+    );
   }else if(siblings[direction].unit !== "wall") {
     if(this.unit === "boy" && siblings[direction].unit === "box" && siblings[direction].getSiblings()[direction].unit !== "box" && siblings[direction].getSiblings()[direction].unit !== "wall") {
       siblings[direction].x += moveCoords[0];
@@ -303,7 +317,12 @@ function handleBlockMove(direction, moveCoords, setMoves, setPushes) {
       this.x += moveCoords[0];
       this.y += moveCoords[1];
       setMoves(prev => prev + 1);
-      // handleLastMove
+      handleLastMove(
+        {
+          coords: {x: moveCoords[0], y: moveCoords[1]},
+          box: siblings[direction]
+        }
+      );
     }
   }
 }
@@ -344,7 +363,7 @@ function createBoxObjects(level, images) {
   }
 }
 
-export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner, setIsLocked) {
+export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner) {
   let markedBoxes = 0;
   gameObjects.forEach(function(obj) {
     if(obj.unit === "box") {
@@ -367,8 +386,9 @@ export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner, set
 }
 
 export function createLevelObjects(level, images) {
-  const player = gameLevels[level - 1].player;
+  gameLastMoves.splice(0);
   gameObjects.splice(0);
+  const player = gameLevels[level - 1].player;
   gameObjects.push(new Block(player[0], player[1], images.boy, "boy"));
   createWallObjects(level, images);
   createBoxObjects(level, images);
@@ -379,4 +399,20 @@ export function drawForeground(canvas) {
   gameObjects.forEach(function(unit) {
     unit.draw(canvas);
   });
+}
+
+export function undoLastMove(setMoves, setPushes, setLastMoveDisabled) {
+  let gameLastMove = gameLastMoves.pop();
+  const player = gameObjects[0];
+  player.x -= gameLastMove.coords.x;
+  player.y -= gameLastMove.coords.y;
+  setMoves(prev => prev - 1);
+  if(gameLastMove.box) {
+    gameLastMove.box.x -= gameLastMove.coords.x;
+    gameLastMove.box.y -= gameLastMove.coords.y;
+    setPushes(prev => prev - 1);
+  }
+  if(gameLastMoves.length === 0) {
+    setLastMoveDisabled(true);
+  }
 }

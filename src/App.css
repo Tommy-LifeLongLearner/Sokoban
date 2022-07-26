@@ -89,3 +89,8 @@ html, body {
   border-color: yellow;
   cursor: pointer;
 }
+
+#game-buttons button[disabled] {
+  color: #ccc;
+  border-color: #ccc;
+}
