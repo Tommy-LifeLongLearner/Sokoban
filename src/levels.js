@@ -241,34 +241,31 @@ export const gameLevels = [
   }
 ];
 
-export const gameObjects = [];
-const gameLastMoves = [];
+let gameObjects = []; // save to local storage
+let gameLastMoves = []; // save to local storage
 
 class Block {
-  constructor(xb, yb, sprite, unit) {
+  constructor(xb, yb, unit) {
     this.x = xb * 50;
     this.y = yb * 50;
-    this.sprite = sprite;
     this.unit = unit;
   }
 
-  draw(canvas) {
-    //boyImage needs custom coords
+  draw(canvas, images) {
+    //boy image needs custom coords
     if(this.unit === "boy") {
-      canvas.current.getContext("2d").drawImage(this.sprite, this.x - 5, this.y - 20, 60, 80);
+      canvas.current.getContext("2d").drawImage(images[this.unit], this.x - 5, this.y - 20, 60, 80);
     }else {
-      canvas.current.getContext("2d").drawImage(this.sprite, this.x, this.y, 50, 50);
+      canvas.current.getContext("2d").drawImage(images[this.unit], this.x, this.y, 50, 50);
     }
   }
 
   move(direction, setMoves, setPushes) {
-    switch(direction) {
-      case 37: handleBlockMove.call(this, "left", [-50,0], setMoves, setPushes); break;
-      case 39: handleBlockMove.call(this, "right", [50,0], setMoves, setPushes); break;
-      case 38: handleBlockMove.call(this, "up", [0,-50], setMoves, setPushes); break;
-      case 40: handleBlockMove.call(this, "down", [0,50], setMoves, setPushes); break;
-      default: break; // only for eslint
-    }
+    const coords = {"left": [-50,0], "right": [50,0], "up": [0,-50], "down": [0,50]};
+    direction = direction.slice(5).toLowerCase(); // extract direction from event.key
+    handleBlockMove.call(this, direction, coords[direction], setMoves, setPushes);
+    saveData("gameObjects", gameObjects);
+    saveData("gameLastMoves", gameLastMoves);
   }
 
   //return the siblings from the four sides left, right, up and down
@@ -298,29 +295,32 @@ function handleLastMove(lastMove) {
 }
 
 function handleBlockMove(direction, moveCoords, setMoves, setPushes) {
-  const siblings = this.getSiblings();
-  if(siblings[direction] === 0) {
+  const nextSibling = this.getSiblings()[direction];
+  
+  if(nextSibling === 0) {
     this.x += moveCoords[0];
     this.y += moveCoords[1];
-    setMoves(prev => prev + 1);
+    setMoves(prev => saveData("moves", prev + 1));
     handleLastMove (
       {
         coords: {x: moveCoords[0], y: moveCoords[1]},
         box: null
       }
     );
-  }else if(siblings[direction].unit !== "wall") {
-    if(this.unit === "boy" && siblings[direction].unit === "box" && siblings[direction].getSiblings()[direction].unit !== "box" && siblings[direction].getSiblings()[direction].unit !== "wall") {
-      siblings[direction].x += moveCoords[0];
-      siblings[direction].y += moveCoords[1];
-      setPushes(prev => prev + 1);
+  }else if(nextSibling.unit !== "wall") {
+    const secondNextSibling = nextSibling.getSiblings()[direction];
+    if(this.unit === "boy" && (nextSibling.unit === "box" || nextSibling.unit === "goldenBox") && secondNextSibling.unit !== "box" && secondNextSibling.unit !== "goldenBox" && secondNextSibling.unit !== "wall") {
+      nextSibling.x += moveCoords[0];
+      nextSibling.y += moveCoords[1];
+      setPushes(prev => saveData("pushes", prev + 1));
       this.x += moveCoords[0];
       this.y += moveCoords[1];
-      setMoves(prev => prev + 1);
+      setMoves(prev => saveData("moves", prev + 1));
       handleLastMove(
         {
           coords: {x: moveCoords[0], y: moveCoords[1]},
-          box: siblings[direction]
+          box: nextSibling,
+          boxIndex: gameObjects.indexOf(nextSibling)
         }
       );
     }
@@ -350,7 +350,7 @@ function createWallObjects(level, images) {
   for(var i = 0;i < 9;i++) {
     for(var j = 0;j < 9;j++) {
       if(gameLevels[level - 1].background[i][j] === 'w') {
-        gameObjects.push(new Block(j, i, images.wall, "wall"));
+        gameObjects.push(new Block(j, i, "wall"));
       }
     }
   }
@@ -359,23 +359,24 @@ function createWallObjects(level, images) {
 function createBoxObjects(level, images) {
   for(var i = 0;i < gameLevels[level - 1].boxes.length;i++) {
     const box = gameLevels[level - 1].boxes[i];
-    gameObjects.push(new Block(box[0], box[1], images.box, "box"));
+    gameObjects.push(new Block(box[0], box[1], "box"));
   }
 }
 
 export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner) {
   let markedBoxes = 0;
   gameObjects.forEach(function(obj) {
-    if(obj.unit === "box") {
-      obj.sprite = images.box;
+    if(obj.unit === "box" || obj.unit === "goldenBox") {
+      obj.unit = "box";
       gameLevels[level - 1].marks.forEach(function(mark) {
         if(mark[0] === obj.x / 50 && mark[1] === obj.y / 50) {
-          obj.sprite = images.goldenBox;
+          obj.unit = "goldenBox";
           markedBoxes++;
         }
       });
     }
   });
+
   if(markedBoxes === gameLevels[level - 1].marks.length) {
     document.body.onkeyup = null;
     setTimeout(function() {
@@ -385,20 +386,58 @@ export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner) {
   }
 }
 
-export function createLevelObjects(level, images) {
-  gameLastMoves.splice(0);
-  gameObjects.splice(0);
-  const player = gameLevels[level - 1].player;
-  gameObjects.push(new Block(player[0], player[1], images.boy, "boy"));
-  createWallObjects(level, images);
-  createBoxObjects(level, images);
+function recreateSavedObjects() {
+  let gameObjects = getSavedData("gameObjects");
+  return gameObjects.map(({x, y, unit}) => new Block(x / 50, y / 50, unit));
 }
 
-export function drawForeground(canvas) {
+export function createLevelObjects(level, images) {
+  gameLastMoves = getSavedData("gameLastMoves");
+  gameObjects = recreateSavedObjects();
+  const player = gameLevels[level - 1].player;
+  if(gameObjects.length === 0) {
+    gameObjects.push(new Block(player[0], player[1], "boy"));
+    createWallObjects(level, images);
+    createBoxObjects(level, images);
+  }
+}
+
+export function drawForeground(canvas, images) {
   canvas.current.getContext("2d").clearRect(0, 0, 450, 450);
   gameObjects.forEach(function(unit) {
-    unit.draw(canvas);
+    unit.draw(canvas, images);
   });
+}
+
+export function resetSavedData() {
+  // Initialize a template for saving the data, this way
+  // I don't need to check if something is missing and then
+  // give it an initial value, that's too much unnecessary work
+  localStorage.sokoban = JSON.stringify({
+    lastMoveDisabled: true,
+    moves: 0,
+    pushes: 0,
+    gameObjects: [],
+    gameLastMoves: [],
+    level: 1
+  });
+}
+
+export function saveData(name, value) {
+  if(!localStorage.sokoban) {
+    resetSavedData();
+  }
+  let sokoban = JSON.parse(localStorage.sokoban);
+  sokoban[name] = value;
+  localStorage.sokoban = JSON.stringify(sokoban);
+  return value; // so it can be used inside a state setter
+}
+
+export function getSavedData(name) {
+  if(!localStorage.sokoban) {
+    resetSavedData();
+  }
+  return JSON.parse(localStorage.sokoban)[name];
 }
 
 export function undoLastMove(setMoves, setPushes, setLastMoveDisabled) {
@@ -406,13 +445,19 @@ export function undoLastMove(setMoves, setPushes, setLastMoveDisabled) {
   const player = gameObjects[0];
   player.x -= gameLastMove.coords.x;
   player.y -= gameLastMove.coords.y;
-  setMoves(prev => prev - 1);
+  setMoves(prev => saveData("moves", prev - 1));
   if(gameLastMove.box) {
-    gameLastMove.box.x -= gameLastMove.coords.x;
-    gameLastMove.box.y -= gameLastMove.coords.y;
-    setPushes(prev => prev - 1);
+    let box = gameObjects[gameLastMove.boxIndex];
+    box.x -= gameLastMove.coords.x;
+    box.y -= gameLastMove.coords.y;
+    setPushes(prev => saveData("pushes", prev - 1));
   }
   if(gameLastMoves.length === 0) {
-    setLastMoveDisabled(true);
+    setLastMoveDisabled(saveData("lastMoveDisabled", true));
   }
+}
+
+export function movePlayer(keyCode, setMoves, setPushes) {
+  const player = gameObjects[0];
+  player.move(keyCode, setMoves, setPushes);
 }

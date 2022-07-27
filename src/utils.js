@@ -1,3 +1,11 @@
+import box from "./img/box.png";
+import goldenBox from "./img/golden-box.png";
+import tree from "./img/tree.png";
+import wall from "./img/wall.png";
+import boy from "./img/boy.png";
+import grass from "./img/grass.png";
+import mark from "./img/mark.png";
+
 function createImage(imageSrc) {
   return new Promise((res, rej) => {
     let newImage = new Image();
@@ -9,11 +17,11 @@ function createImage(imageSrc) {
   });
 }
 
-export async function createImages(imagesSrc) {
+export async function createImages() {
+  const images = {box, goldenBox, tree, wall, boy, grass, mark};
   // imagesSrc is an object of image names as key and the imported images as value
-  const images = {};
-  for(let image in imagesSrc) {
-    images[image] = await createImage(imagesSrc[image]);
+  for(let image in images) {
+    images[image] = await createImage(images[image]);
   }
   return images;
 }

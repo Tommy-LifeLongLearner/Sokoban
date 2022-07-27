@@ -1,37 +1,31 @@
-import box from "./img/box.png";
-import goldenBox from "./img/golden-box.png";
-import tree from "./img/tree.png";
-import wall from "./img/wall.png";
-import boy from "./img/boy.png";
-import grass from "./img/grass.png";
-import mark from "./img/mark.png";
 import './App.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { createImages, formatNumber } from './utils';
 import { Buttons } from "./Buttons";
 import { Statistics } from "./Statistics";
-import { drawBackground, drawForeground, createLevelObjects, gameObjects, handelMarkedBoxes, undoLastMove } from "./levels";
+import { drawBackground, drawForeground, createLevelObjects, handelMarkedBoxes, undoLastMove, saveData, getSavedData, movePlayer, resetSavedData } from "./levels";
 
 function App() {
-  const [images, setImages] = useState({box, goldenBox, tree, wall, boy, grass, mark});
+  const [images, setImages] = useState(null);
   const [moves, setMoves] = useState(0);
   const [level, setLevel] = useState(1);
   const [pushes, setPushes] = useState(0);
   const [didImagesLoad, setDidImagesLoad] = useState(false);
-  const [isWinner, setIsWinner] = useState(false);
+  const [isWinner, setIsWinner] = useState();
   const [levelRestart, setLevelRestart] = useState(false);
-  const [lastMoveDisabled, setLastMoveDisabled] = useState(true);
+  const [lastMoveDisabled, setLastMoveDisabled] = useState();
   const frontCanvas = useRef();
   const backCanvas = useRef();
 
+  // handling user keypress
   useEffect(() => {
     document.body.onkeyup = function(e) {
-      if(e.keyCode >= 37 && e.keyCode <= 40) {
-        const player = gameObjects[0];
-        player.move(e.keyCode, setMoves, setPushes);
+      const isArrowKey = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key);
+      if(isArrowKey) {
+        movePlayer(e.key, setMoves, setPushes);
         handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
-        drawForeground(frontCanvas, level, images);
-        setLastMoveDisabled(false);
+        drawForeground(frontCanvas, images);
+        setLastMoveDisabled(saveData("lastMoveDisabled", false));
       }
     };
 
@@ -40,48 +34,58 @@ function App() {
     }
   }, [level, images]);
 
+  // loading images
   useEffect(() => {
     async function initializeImages() {
-      setImages(await createImages(images));
+      setImages(await createImages());
       setDidImagesLoad(true);
     }
 
     initializeImages();
-  }, [images]);
+  }, []);
+
+  useEffect(() => {
+    setMoves(getSavedData("moves"));
+    setLevel(getSavedData("level"));
+    setPushes(getSavedData("pushes"));
+    setLastMoveDisabled(getSavedData("lastMoveDisabled"));
+  }, [level]);
+
+  useEffect(() => {
+    if(isWinner) {
+      document.body.onkeyup = null;
+    }
+  }, [isWinner]);
 
   useEffect(() => {
     // render once per level
     if(didImagesLoad) {
-      setLastMoveDisabled(true);
-      setMoves(0);
-      setPushes(0);
       drawBackground(backCanvas, level, images);
       createLevelObjects(level, images);
       handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
-      drawForeground(frontCanvas, level, images);
+      drawForeground(frontCanvas, images);
     }
-
-    if(isWinner) {
-      document.body.onkeyup = null;
-    }
-  }, [level, didImagesLoad, images, isWinner, levelRestart]);
+  }, [level, didImagesLoad, images, levelRestart]);
 
   function increaseLevel() {
-    setLevel(prev => prev < 15 ? prev + 1 : 1);
+    resetSavedData();
+    setLevel(prev => saveData("level", prev < 15 ? prev + 1 : 1));
   }
 
   function decreaseLevel() {
-    setLevel(prev => prev > 1 ? prev - 1 : 15);
+    resetSavedData();
+    setLevel(prev => saveData("level", prev > 1 ? prev - 1 : 15));
   }
 
   function restartLevel() {
+    resetSavedData();
     setLevelRestart(prev => !prev);
   }
 
   function undoLastMoveHandler() {
     undoLastMove(setMoves, setPushes, setLastMoveDisabled);
     handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
-    drawForeground(frontCanvas, level, images);
+    drawForeground(frontCanvas, images);
   }
 
   return (
