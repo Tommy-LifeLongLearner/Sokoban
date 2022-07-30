@@ -1,6 +1,6 @@
 import './App.css';
 import React, { useState, useEffect, useRef } from 'react';
-import { createImages, formatNumber } from './utils';
+import { createImages} from './utils';
 import { Buttons } from "./Buttons";
 import { Statistics } from "./Statistics";
 import { drawBackground, drawForeground, createLevelObjects, handelMarkedBoxes, undoLastMove, saveData, getSavedData, movePlayer, resetSavedData } from "./levels";
@@ -9,32 +9,26 @@ function App() {
   const [images, setImages] = useState(null);
   const [moves, setMoves] = useState(0);
   const [level, setLevel] = useState(1);
+  const [reachedLevel, setReachedLevel] = useState(1);
   const [pushes, setPushes] = useState(0);
   const [didImagesLoad, setDidImagesLoad] = useState(false);
-  const [isWinner, setIsWinner] = useState();
-  const [levelRestart, setLevelRestart] = useState(false);
-  const [lastMoveDisabled, setLastMoveDisabled] = useState();
+  const [isWinner, setIsWinner] = useState(false);
+  const [lastMoveDisabled, setLastMoveDisabled] = useState(true);
+  const [nextLevelDisabled, setNextLevelDisabled] = useState(true);
+  const [prevLevelDisabled, setPrevLevelDisabled] = useState(true);
   const frontCanvas = useRef();
   const backCanvas = useRef();
 
-  // handling user keypress
+  // loading saved data only once
   useEffect(() => {
-    document.body.onkeyup = function(e) {
-      const isArrowKey = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key);
-      if(isArrowKey) {
-        movePlayer(e.key, setMoves, setPushes);
-        handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
-        drawForeground(frontCanvas, images);
-        setLastMoveDisabled(saveData("lastMoveDisabled", false));
-      }
-    };
+    setMoves(getSavedData("moves"));
+    setLevel(getSavedData("level"));
+    setPushes(getSavedData("pushes"));
+    setLastMoveDisabled(getSavedData("lastMoveDisabled"));
+    setReachedLevel(getSavedData("reachedLevel"));
+  }, []);
 
-    return _=> {
-      document.body.onkeyup = null;
-    }
-  }, [level, images]);
-
-  // loading images
+  // loading images only once
   useEffect(() => {
     async function initializeImages() {
       setImages(await createImages());
@@ -44,55 +38,95 @@ function App() {
     initializeImages();
   }, []);
 
+  // handling user keypress
   useEffect(() => {
-    setMoves(getSavedData("moves"));
-    setLevel(getSavedData("level"));
-    setPushes(getSavedData("pushes"));
-    setLastMoveDisabled(getSavedData("lastMoveDisabled"));
-  }, [level]);
+    document.body.onkeyup = function(e) {
+      const isArrowKey = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key);
+      if(isArrowKey) {
+        runGameLogic(e.key);
+      }
+    };
 
-  useEffect(() => {
-    if(isWinner) {
+    return _=> {
       document.body.onkeyup = null;
     }
-  }, [isWinner]);
+  }, [level, images]);
+
+  function runGameLogic(key) {
+    movePlayer(key, setMoves, setPushes);
+    handelMarkedBoxes(level, increaseReachedLevel, setIsWinner);
+    drawForeground(frontCanvas, images);
+    setLastMoveDisabled(saveData("lastMoveDisabled", false));
+  }
 
   useEffect(() => {
     // render once per level
     if(didImagesLoad) {
-      drawBackground(backCanvas, level, images);
-      createLevelObjects(level, images);
-      handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
-      drawForeground(frontCanvas, images);
+      newLevel();
     }
-  }, [level, didImagesLoad, images, levelRestart]);
+  }, [level, didImagesLoad]);
 
-  function increaseLevel() {
+  useEffect(() => {
+    if(isWinner) {
+      document.body.onkeyup = null;
+      resetSavedData();
+    }
+  }, [isWinner]);
+
+  function newLevel() {
+    console.log("Rendering a new level");
     resetSavedData();
-    setLevel(prev => saveData("level", prev < 15 ? prev + 1 : 1));
+    drawBackground(backCanvas, level, images);
+    createLevelObjects(level, images);
+    handelMarkedBoxes(level, increaseReachedLevel, setIsWinner);
+    drawForeground(frontCanvas, images);
+    setPrevLevelDisabled(level === 1);
+    setLastMoveDisabled(true);
+    setNextLevelDisabled(level === reachedLevel);
+  }
+
+  function increaseLevel(isUnreachedLevel) {
+    resetSavedData();
+    let levelLimit = isUnreachedLevel ? reachedLevel + 1 : reachedLevel;
+    isUnreachedLevel && setReachedLevel(prev => saveData("reachedLevel", prev < 15 ? prev + 1 : 15));
+    setLevel(prev => saveData("level", level < levelLimit ? prev + 1 : prev));
+  }
+
+  function increaseReachedLevel() {
+    level === 15 ? setIsWinner(true) : increaseLevel(true);
+  }
+
+  function handleNextLevelClick() {
+    level < reachedLevel && increaseLevel();
+  }
+
+  function handlePrevLevelClick() {
+    level > 1 && decreaseLevel();
   }
 
   function decreaseLevel() {
     resetSavedData();
-    setLevel(prev => saveData("level", prev > 1 ? prev - 1 : 15));
+    setReachedLevel(prev => saveData("reachedLevel", prev));
+    setLevel(prev => saveData("level", prev - 1));
   }
 
-  function restartLevel() {
+  function handleRestartLevelClick() {
     resetSavedData();
-    setLevelRestart(prev => !prev);
+    setReachedLevel(prev => saveData("reachedLevel", prev));
+    newLevel();
   }
 
-  function undoLastMoveHandler() {
+  function handleUndoLastMoveClick() {
     undoLastMove(setMoves, setPushes, setLastMoveDisabled);
-    handelMarkedBoxes(level, images, increaseLevel, setIsWinner);
+    handelMarkedBoxes(level, increaseReachedLevel, setIsWinner);
     drawForeground(frontCanvas, images);
   }
 
   return (
     <div id="game-container" winner={isWinner ? "yes" : ""}>
       <div id="game-top-bar">
-        <Buttons increaseLevel={increaseLevel} decreaseLevel={decreaseLevel} restartLevel={restartLevel} undoLastMove={undoLastMoveHandler} lastMoveDisabled={lastMoveDisabled}/>
-        <Statistics level={formatNumber(level)} moves={formatNumber(moves)} pushes={formatNumber(pushes)}/>
+        <Buttons handlers={{handleNextLevelClick, handlePrevLevelClick, handleRestartLevelClick, handleUndoLastMoveClick}} data={{lastMoveDisabled, nextLevelDisabled, prevLevelDisabled}} />
+        <Statistics data={{level, moves, pushes}}/>
       </div>
       <canvas ref={backCanvas} width="450" height="450"></canvas>
       <canvas ref={frontCanvas} width="450" height="450"></canvas>

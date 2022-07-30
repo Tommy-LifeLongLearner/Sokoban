@@ -1,9 +1,11 @@
 import React from "react";
+import { formatNumber } from "./utils";
 
-export function Statistics({level, moves, pushes}) {
+export function Statistics(props) {
+  const { level, moves, pushes } = props.data;
   return (
     <div id="game-statistics" className="c-flex">
-      Level: <span style={{marginRight: 10}}>{level}</span> Moves: <span style={{marginRight: 10}}>{moves}</span> Pushes: <span>{pushes}</span>
+      Level: <span style={{marginRight: 10}}>{formatNumber(level, 2)}</span> Moves: <span style={{marginRight: 10}}>{formatNumber(moves, 4)}</span> Pushes: <span>{formatNumber(pushes, 4)}</span>
     </div>
   );
 }

@@ -363,7 +363,7 @@ function createBoxObjects(level, images) {
   }
 }
 
-export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner) {
+export function handelMarkedBoxes(level, increaseReachedLevel, setIsWinner) {
   let markedBoxes = 0;
   gameObjects.forEach(function(obj) {
     if(obj.unit === "box" || obj.unit === "goldenBox") {
@@ -377,11 +377,11 @@ export function handelMarkedBoxes(level, images, increaseLevel, setIsWinner) {
     }
   });
 
+
   if(markedBoxes === gameLevels[level - 1].marks.length) {
     document.body.onkeyup = null;
     setTimeout(function() {
-      increaseLevel();
-      level === 15 && setIsWinner(true);
+      increaseReachedLevel();
     }, 500);
   }
 }
@@ -394,6 +394,7 @@ function recreateSavedObjects() {
 export function createLevelObjects(level, images) {
   gameLastMoves = getSavedData("gameLastMoves");
   gameObjects = recreateSavedObjects();
+  console.log(gameLastMoves, gameObjects);
   const player = gameLevels[level - 1].player;
   if(gameObjects.length === 0) {
     gameObjects.push(new Block(player[0], player[1], "boy"));
@@ -419,6 +420,7 @@ export function resetSavedData() {
     pushes: 0,
     gameObjects: [],
     gameLastMoves: [],
+    reachedLevel: 1,
     level: 1
   });
 }
@@ -441,6 +443,9 @@ export function getSavedData(name) {
 }
 
 export function undoLastMove(setMoves, setPushes, setLastMoveDisabled) {
+  if(gameLastMoves.length === 0) {
+    return;
+  }
   let gameLastMove = gameLastMoves.pop();
   const player = gameObjects[0];
   player.x -= gameLastMove.coords.x;
@@ -455,6 +460,7 @@ export function undoLastMove(setMoves, setPushes, setLastMoveDisabled) {
   if(gameLastMoves.length === 0) {
     setLastMoveDisabled(saveData("lastMoveDisabled", true));
   }
+  saveData("gameObjects", gameObjects);
 }
 
 export function movePlayer(keyCode, setMoves, setPushes) {
