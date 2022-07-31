@@ -3,7 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createImages} from './utils';
 import { Buttons } from "./Buttons";
 import { Statistics } from "./Statistics";
-import { drawBackground, drawForeground, createLevelObjects, handelMarkedBoxes, undoLastMove, saveData, getSavedData, movePlayer, resetSavedData } from "./levels";
+import { Players } from "./Players";
+import { drawBackground, drawForeground } from "./screen";
+import { saveData, getSavedData, resetSavedData } from './storage';
+import { createLevelObjects, handelMarkedBoxes, undoLastMove, movePlayer, changePlayer } from "./logic";
 
 function App() {
   const [images, setImages] = useState(null);
@@ -16,6 +19,8 @@ function App() {
   const [lastMoveDisabled, setLastMoveDisabled] = useState(true);
   const [nextLevelDisabled, setNextLevelDisabled] = useState(true);
   const [prevLevelDisabled, setPrevLevelDisabled] = useState(true);
+  const [settingsHidden, setSettingsHidden] = useState(true);
+  const [playersListHidden, setPlayersListHidden] = useState(true);
   const frontCanvas = useRef();
   const backCanvas = useRef();
 
@@ -26,6 +31,7 @@ function App() {
     setPushes(getSavedData("pushes"));
     setLastMoveDisabled(getSavedData("lastMoveDisabled"));
     setReachedLevel(getSavedData("reachedLevel"));
+    changePlayer(getSavedData("selectedPlayer"));
   }, []);
 
   // loading images only once
@@ -54,7 +60,7 @@ function App() {
 
   function runGameLogic(key) {
     movePlayer(key, setMoves, setPushes);
-    handelMarkedBoxes(level, increaseReachedLevel, setIsWinner);
+    handelMarkedBoxes(level, increaseReachedLevel);
     drawForeground(frontCanvas, images);
     setLastMoveDisabled(saveData("lastMoveDisabled", false));
   }
@@ -75,10 +81,11 @@ function App() {
 
   function newLevel() {
     console.log("Rendering a new level");
-    resetSavedData();
+    setMoves(0);
+    setPushes(0);
     drawBackground(backCanvas, level, images);
     createLevelObjects(level, images);
-    handelMarkedBoxes(level, increaseReachedLevel, setIsWinner);
+    handelMarkedBoxes(level, increaseReachedLevel);
     drawForeground(frontCanvas, images);
     setPrevLevelDisabled(level === 1);
     setLastMoveDisabled(true);
@@ -106,27 +113,54 @@ function App() {
 
   function decreaseLevel() {
     resetSavedData();
-    setReachedLevel(prev => saveData("reachedLevel", prev));
     setLevel(prev => saveData("level", prev - 1));
   }
 
   function handleRestartLevelClick() {
     resetSavedData();
-    setReachedLevel(prev => saveData("reachedLevel", prev));
     newLevel();
   }
 
   function handleUndoLastMoveClick() {
     undoLastMove(setMoves, setPushes, setLastMoveDisabled);
-    handelMarkedBoxes(level, increaseReachedLevel, setIsWinner);
+    handelMarkedBoxes(level, increaseReachedLevel);
+    drawForeground(frontCanvas, images);
+  }
+
+  function handleSettingsClick() {
+    setSettingsHidden(!settingsHidden);
+  }
+
+  function showPlayersList() {
+    setPlayersListHidden(false);
+    setSettingsHidden(true);
+  }
+
+  function notImpelemntedYet() {
+    alert("Not yet implemented");
+  }
+
+  function handleMenuItemClick(e) {
+    let isClick = e.target.nodeName === "LI";
+    const actions = {
+      "Change Player": showPlayersList,
+      "Custom Game": notImpelemntedYet
+    };
+    isClick && actions[e.target.textContent]();
+  }
+
+  function handleCharSelect(charName) {
+    setPlayersListHidden(true);
+    changePlayer(charName);
     drawForeground(frontCanvas, images);
   }
 
   return (
     <div id="game-container" winner={isWinner ? "yes" : ""}>
       <div id="game-top-bar">
-        <Buttons handlers={{handleNextLevelClick, handlePrevLevelClick, handleRestartLevelClick, handleUndoLastMoveClick}} data={{lastMoveDisabled, nextLevelDisabled, prevLevelDisabled}} />
+        <Buttons handlers={{handleNextLevelClick, handlePrevLevelClick, handleRestartLevelClick, handleUndoLastMoveClick, handleSettingsClick, handleMenuItemClick}} data={{lastMoveDisabled, nextLevelDisabled, prevLevelDisabled, settingsHidden}} />
         <Statistics data={{level, moves, pushes}}/>
+        <Players data={{playersListHidden}} handlers={{handleCharSelect}}/>
       </div>
       <canvas ref={backCanvas} width="450" height="450"></canvas>
       <canvas ref={frontCanvas} width="450" height="450"></canvas>
